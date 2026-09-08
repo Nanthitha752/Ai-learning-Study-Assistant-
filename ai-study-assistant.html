@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slate — AI Learning & Study Assistant</title>
+<style>
+  :root{
+    --board:#1E2A24;
+    --board-2:#25342C;
+    --panel:#2B3B32;
+    --chalk:#EDEAE0;
+    --chalk-dim:#A9B7AC;
+    --amber:#E9C46A;
+    --coral:#E8836B;
+    --mint:#7FD1AE;
+    --line: rgba(237,234,224,0.14);
+    --radius: 3px;
+    font-size: 16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--board);
+    color:var(--chalk);
+    font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=Caveat:wght@600&display=swap');
+  h1,h2,h3{font-family:"Lora", Georgia, serif; font-weight:600; margin:0;}
+  .app{max-width:980px; margin:0 auto; padding:18px 16px 60px;}
+  header.top{
+    display:flex; align-items:baseline; justify-content:space-between;
+    border-bottom:1px solid var(--line); padding-bottom:14px; margin-bottom:16px;
+    flex-wrap:wrap; gap:8px;
+  }
+  header.top h1{font-size:1.5rem; letter-spacing:.2px;}
+  header.top h1 .dot{color:var(--amber);}
+  header.top .tagline{color:var(--chalk-dim); font-size:.85rem; margin-top:2px;}
+  .keysetup{
+    background:var(--panel); border:1px dashed var(--line); border-radius:var(--radius);
+    padding:10px 12px; font-size:.82rem; color:var(--chalk-dim); margin-bottom:16px;
+  }
+  nav.tabs{
+    display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:18px;
+    overflow-x:auto;
+  }
+  nav.tabs button{
+    background:none; border:none; color:var(--chalk-dim); font-family:inherit;
+    font-size:.92rem; padding:9px 14px; cursor:pointer; white-space:nowrap;
+    border-bottom:2px solid transparent; position:relative; top:1px;
+  }
+  nav.tabs button.active{ color:var(--chalk); border-bottom:2px solid var(--amber); }
+  nav.tabs button .pillar{ display:block; font-size:.65rem; color:var(--chalk-dim); margin-top:1px; }
+  section.panel{ display:none; }
+  section.panel.active{ display:block; animation:fade .25s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(3px);} to{opacity:1; transform:none;} }
+
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; margin-bottom:14px;
+  }
+  label{ display:block; font-size:.8rem; color:var(--chalk-dim); margin-bottom:5px; }
+  input[type=text], input[type=number], textarea, select{
+    width:100%; background:var(--board-2); border:1px solid var(--line); color:var(--chalk);
+    border-radius:var(--radius); padding:9px 10px; font-family:inherit; font-size:.92rem;
+    margin-bottom:12px;
+  }
+  textarea{ min-height:90px; resize:vertical; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .row > *{ flex:1; min-width:140px; }
+  button.btn{
+    background:var(--amber); color:#1E2A24; border:none; font-family:inherit;
+    font-weight:600; font-size:.9rem; padding:10px 16px; border-radius:var(--radius);
+    cursor:pointer;
+  }
+  button.btn.secondary{ background:transparent; border:1px solid var(--line); color:var(--chalk); }
+  button.btn:disabled{ opacity:.5; cursor:default; }
+  .muted{ color:var(--chalk-dim); font-size:.85rem; }
+  .chip{
+    display:inline-block; font-size:.7rem; color:var(--board); background:var(--mint);
+    padding:2px 7px; border-radius:20px; margin-right:6px;
+  }
+  .chip.amber{ background:var(--amber); }
+  .chip.coral{ background:var(--coral); }
+
+  /* Ask tab */
+  #chatlog{ min-height:220px; max-height:420px; overflow-y:auto; margin-bottom:12px; padding-right:4px;}
+  .msg{ margin-bottom:14px; }
+  .msg .who{ font-size:.72rem; color:var(--chalk-dim); margin-bottom:3px; }
+  .msg .bubble{ background:var(--board-2); border-radius:var(--radius); padding:10px 12px; font-size:.92rem; line-height:1.5; white-space:pre-wrap;}
+  .msg.user .bubble{ background:#33463A; }
+  .tool-trace{ font-size:.72rem; color:var(--mint); margin:4px 0 8px 2px; font-style:italic; }
+
+  /* Materials */
+  .material-item{ border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;}
+  .material-item .t{font-weight:600; font-size:.9rem;}
+  .material-item .del{background:none; border:none; color:var(--coral); cursor:pointer; font-size:.8rem;}
+
+  /* Plan */
+  .day-block{ border-left:2px solid var(--amber); padding-left:12px; margin-bottom:14px; }
+  .day-block h3{ font-size:.95rem; margin-bottom:6px; }
+  .task{ display:flex; gap:8px; align-items:flex-start; margin-bottom:6px; font-size:.88rem; }
+  .task input{ width:auto; margin:3px 0 0 0; }
+  .task.done label{ text-decoration:line-through; color:var(--chalk-dim); }
+
+  /* Quiz */
+  .qcard{ margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+  .qcard .qtext{ font-size:.95rem; margin-bottom:8px; }
+  .opt{ display:block; width:100%; text-align:left; background:var(--board-2); border:1px solid var(--line);
+    color:var(--chalk); padding:8px 10px; border-radius:var(--radius); margin-bottom:6px; cursor:pointer; font-size:.88rem;}
+  .opt.correct{ border-color:var(--mint); background:#2C4A3D; }
+  .opt.wrong{ border-color:var(--coral); background:#4A2E2A; }
+  .explain{ font-size:.82rem; color:var(--chalk-dim); margin-top:4px; }
+
+  /* Progress */
+  .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:16px;}
+  .stat{ background:var(--board-2); border-radius:var(--radius); padding:12px; }
+  .stat .num{ font-family:"Lora",serif; font-size:1.6rem; color:var(--amber); }
+  .stat .lbl{ font-size:.75rem; color:var(--chalk-dim); }
+  .bar-row{ display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:.8rem; }
+  .bar-track{ flex:1; background:var(--board-2); border-radius:20px; height:8px; overflow:hidden; }
+  .bar-fill{ height:100%; background:var(--mint); }
+  .flash{ background:var(--board-2); border-radius:var(--radius); padding:10px 12px; margin-bottom:8px; }
+  .flash .q{ font-weight:600; font-size:.88rem; }
+  .flash .a{ font-size:.85rem; color:var(--chalk-dim); margin-top:3px; }
+  .empty{ color:var(--chalk-dim); font-size:.85rem; font-style:italic; padding:16px 0;}
+  .loading{ color:var(--amber); font-size:.85rem; }
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div>
+      <h1>Slate<span class="dot">.</span></h1>
+      <div class="tagline">AI Learning &amp; Study Assistant — RAG + Memory + Tools</div>
+    </div>
+    <div class="muted" id="today"></div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="materials" class="active">Materials</button>
+    <button data-tab="plan">Study Plan</button>
+    <button data-tab="ask">Ask<span class="pillar">RAG · Tools</span></button>
+    <button data-tab="quiz">Quiz</button>
+    <button data-tab="progress">Progress<span class="pillar">Memory</span></button>
+  </nav>
+
+  <!-- MATERIALS -->
+  <section class="panel active" id="tab-materials">
+    <div class="card">
+      <h2 style="font-size:1.05rem; margin-bottom:10px;">Add course material</h2>
+      <p class="muted" style="margin-top:-4px; margin-bottom:12px;">Paste notes, a syllabus, or a reading. Slate breaks it into passages it can search later when you ask questions — this is the retrieval (RAG) layer.</p>
+      <label>Title</label>
+      <input type="text" id="matTitle" placeholder="e.g. Chapter 4 — Cell Biology">
+      <label>Content</label>
+      <textarea id="matText" placeholder="Paste your notes or reading here..."></textarea>
+      <button class="btn" id="addMaterial">Save material</button>
+    </div>
+    <div class="card">
+      <h2 style="font-size:1rem; margin-bottom:10px;">Your library</h2>
+      <div id="materialList"></div>
+    </div>
+  </section>
+
+  <!-- PLAN -->
+  <section class="panel" id="tab-plan">
+    <div class="card">
+      <h2 style="font-size:1.05rem; margin-bottom:10px;">Generate a study plan</h2>
+      <div class="row">
+        <div>
+          <label>Subject / topic</label>
+          <input type="text" id="planSubject" placeholder="e.g. Organic Chemistry — reactions">
+        </div>
+        <div>
+          <label>Days available</label>
+          <input type="number" id="planDays" value="5" min="1" max="14">
+        </div>
+      </div>
+      <label>Goal</label>
+      <input type="text" id="planGoal" placeholder="e.g. Be ready for the midterm">
+      <button class="btn" id="genPlan">Generate plan</button>
+      <span class="loading" id="planLoading" style="display:none; margin-left:10px;">Thinking…</span>
+    </div>
+    <div id="planList"></div>
+  </section>
+
+  <!-- ASK -->
+  <section class="panel" id="tab-ask">
+    <div class="card">
+      <div id="chatlog"></div>
+      <div class="row" style="margin-bottom:0;">
+        <input type="text" id="chatInput" placeholder="Ask about your materials, or anything you're studying...">
+        <button class="btn" id="chatSend" style="flex:0 0 auto;">Ask</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">Slate can search your saved materials and can save key facts as flashcards while it answers.</p>
+    </div>
+  </section>
+
+  <!-- QUIZ -->
+  <section class="panel" id="tab-quiz">
+    <div class="card">
+      <h2 style="font-size:1.05rem; margin-bottom:10px;">Generate a quiz</h2>
+      <div class="row">
+        <div>
+          <label>From material</label>
+          <select id="quizSource"><option value="">— topic only —</option></select>
+        </div>
+        <div>
+          <label>Topic (optional if material chosen)</label>
+          <input type="text" id="quizTopic" placeholder="e.g. photosynthesis">
+        </div>
+        <div style="max-width:110px;">
+          <label># Questions</label>
+          <input type="number" id="quizCount" value="5" min="3" max="10">
+        </div>
+      </div>
+      <button class="btn" id="genQuiz">Generate quiz</button>
+      <span class="loading" id="quizLoading" style="display:none; margin-left:10px;">Writing questions…</span>
+    </div>
+    <div class="card" id="quizArea" style="display:none;"></div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section class="panel" id="tab-progress">
+    <div class="stat-grid" id="statGrid"></div>
+    <div class="card">
+      <h2 style="font-size:1rem; margin-bottom:10px;">Quiz history</h2>
+      <div id="quizHistoryList"></div>
+    </div>
+    <div class="card">
+      <h2 style="font-size:1rem; margin-bottom:10px;">Flashcard deck</h2>
+      <div id="flashList"></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+document.getElementById('today').textContent = new Date().toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'});
+
+/* ---------- storage helpers ---------- */
+async function loadKey(key, fallback){
+  try{
+    const r = await window.storage.get(key, false);
+    return r ? JSON.parse(r.value) : fallback;
+  }catch(e){ return fallback; }
+}
+async function saveKey(key, value){
+  try{ await window.storage.set(key, JSON.stringify(value), false); }catch(e){ console.error('storage save failed', e); }
+}
+
+let materials = [];
+let plans = [];
+let flashcards = [];
+let quizHistory = [];
+let chatHistory = []; // {role, content} for display + api
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('section.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab==='progress') renderProgress();
+    if(btn.dataset.tab==='quiz') renderQuizSourceOptions();
+  });
+});
+
+/* ---------- Claude API ---------- */
+async function callClaude(messages, system, tools){
+  const body = { model:"claude-sonnet-4-6", max_tokens:1000, messages };
+  if(system) body.system = system;
+  if(tools) body.tools = tools;
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body)
+  });
+  return await resp.json();
+}
+
+/* ---------- RAG: chunk + search ---------- */
+function chunkText(text, size=550){
+  const clean = text.replace(/\s+/g,' ').trim();
+  const chunks = [];
+  for(let i=0;i<clean.length;i+=size){
+    chunks.push(clean.slice(i, i+size));
+  }
+  return chunks.length? chunks : [clean];
+}
+function searchMaterials(query){
+  const qWords = query.toLowerCase().match(/[a-z0-9]+/g) || [];
+  let scored = [];
+  materials.forEach(m=>{
+    m.chunks.forEach((chunk, idx)=>{
+      const cLower = chunk.toLowerCase();
+      let score = 0;
+      qWords.forEach(w=>{ if(w.length>2 && cLower.includes(w)) score++; });
+      if(score>0) scored.push({title:m.title, chunk, score, idx});
+    });
+  });
+  scored.sort((a,b)=>b.score-a.score);
+  return scored.slice(0,3);
+}
+
+/* ---------- MATERIALS TAB ---------- */
+async function renderMaterials(){
+  const list = document.getElementById('materialList');
+  if(!materials.length){ list.innerHTML = '<div class="empty">No materials yet — add a syllabus or notes above.</div>'; return; }
+  list.innerHTML = materials.map(m=>`
+    <div class="material-item">
+      <div><div class="t">${escapeHtml(m.title)}</div><div class="muted">${m.chunks.length} passage(s)</div></div>
+      <button class="del" data-id="${m.id}">Remove</button>
+    </div>`).join('');
+  list.querySelectorAll('.del').forEach(b=>b.addEventListener('click', async ()=>{
+    materials = materials.filter(m=>m.id!==b.dataset.id);
+    await saveKey('materials', materials);
+    renderMaterials();
+  }));
+}
+document.getElementById('addMaterial').addEventListener('click', async ()=>{
+  const title = document.getElementById('matTitle').value.trim();
+  const text = document.getElementById('matText').value.trim();
+  if(!title || !text) return;
+  materials.push({ id: 'm'+Date.now(), title, chunks: chunkText(text) });
+  await saveKey('materials', materials);
+  document.getElementById('matTitle').value='';
+  document.getElementById('matText').value='';
+  renderMaterials();
+});
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- PLAN TAB ---------- */
+document.getElementById('genPlan').addEventListener('click', async ()=>{
+  const subject = document.getElementById('planSubject').value.trim();
+  const goal = document.getElementById('planGoal').value.trim();
+  const days = parseInt(document.getElementById('planDays').value)||5;
+  if(!subject) return;
+  document.getElementById('planLoading').style.display='inline';
+  const sys = `You are a study planning assistant. Return ONLY valid JSON, no prose, no markdown fences. Shape:
+{"title": string, "days": [{"day": number, "focus": string, "tasks": [string, ...]}]}
+Create exactly ${days} days. Each day 2-4 concrete, specific tasks (not generic like "study more").`;
+  const userMsg = `Subject: ${subject}\nGoal: ${goal || 'general mastery'}\nDays available: ${days}`;
+  try{
+    const data = await callClaude([{role:'user', content:userMsg}], sys);
+    const text = (data.content||[]).map(b=>b.text||'').join('');
+    const clean = text.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    parsed.days.forEach(d=> d.tasks = d.tasks.map(t=> typeof t==='string' ? {text:t, done:false} : t));
+    parsed.id = 'p'+Date.now();
+    plans.unshift(parsed);
+    await saveKey('plans', plans);
+    renderPlans();
+  }catch(e){
+    console.error(e);
+    alert('Could not generate the plan — try again.');
+  }
+  document.getElementById('planLoading').style.display='none';
+});
+function renderPlans(){
+  const el = document.getElementById('planList');
+  if(!plans.length){ el.innerHTML=''; return; }
+  el.innerHTML = plans.map(p=>`
+    <div class="card">
+      <h2 style="font-size:1rem; margin-bottom:12px;">${escapeHtml(p.title)}</h2>
+      ${p.days.map(d=>`
+        <div class="day-block">
+          <h3>Day ${d.day} — ${escapeHtml(d.focus)}</h3>
+          ${d.tasks.map((t,ti)=>`
+            <div class="task ${t.done?'done':''}">
+              <input type="checkbox" data-plan="${p.id}" data-day="${d.day}" data-task="${ti}" ${t.done?'checked':''}>
+              <label>${escapeHtml(t.text)}</label>
+            </div>`).join('')}
+        </div>`).join('')}
+    </div>`).join('');
+  el.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', async ()=>{
+      const plan = plans.find(p=>p.id===cb.dataset.plan);
+      const day = plan.days.find(d=>d.day==cb.dataset.day);
+      day.tasks[cb.dataset.task].done = cb.checked;
+      await saveKey('plans', plans);
+      renderPlans();
+    });
+  });
+}
+
+/* ---------- ASK TAB (tool-use loop: RAG + Memory tools) ---------- */
+const TOOLS = [
+  {
+    name:"search_notes",
+    description:"Search the student's saved course materials for passages relevant to a query. Use this whenever the question might be answered by their uploaded notes.",
+    input_schema:{ type:"object", properties:{ query:{type:"string", description:"search phrase"} }, required:["query"] }
+  },
+  {
+    name:"save_flashcard",
+    description:"Save a question/answer flashcard to the student's persistent flashcard deck for later spaced review. Use this for a genuinely important fact or definition worth memorizing, not for every message.",
+    input_schema:{ type:"object", properties:{ question:{type:"string"}, answer:{type:"string"}, topic:{type:"string"} }, required:["question","answer"] }
+  }
+];
+function renderChat(){
+  const log = document.getElementById('chatlog');
+  log.innerHTML = chatHistory.filter(m=>typeof m.content==='string').map(m=>`
+    <div class="msg ${m.role}">
+      <div class="who">${m.role==='user'?'You':'Slate'}</div>
+      <div class="bubble">${escapeHtml(m.content)}</div>
+    </div>`).join('');
+  log.scrollTop = log.scrollHeight;
+}
+document.getElementById('chatSend').addEventListener('click', sendChat);
+document.getElementById('chatInput').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+
+async function sendChat(){
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value='';
+  chatHistory.push({role:'user', content:text});
+  renderChat();
+  await saveKey('chat-history', chatHistory.slice(-20));
+
+  const sys = "You are Slate, a friendly, precise study assistant. Answer clearly and concisely for a student. Use the search_notes tool when the question may relate to their saved materials. Use save_flashcard sparingly, only for a genuinely key fact.";
+  let apiMessages = chatHistory.filter(m=>typeof m.content==='string').map(m=>({role:m.role, content:m.content}));
+
+  const log = document.getElementById('chatlog');
+  log.insertAdjacentHTML('beforeend', `<div class="tool-trace" id="thinking">Slate is thinking…</div>`);
+  log.scrollTop = log.scrollHeight;
+
+  try{
+    let loopGuard = 0;
+    while(loopGuard++ < 4){
+      const data = await callClaude(apiMessages, sys, TOOLS);
+      const content = data.content || [];
+      const toolUses = content.filter(b=>b.type==='tool_use');
+
+      if(toolUses.length){
+        const traceEl = document.getElementById('thinking');
+        apiMessages.push({role:'assistant', content});
+        const toolResults = [];
+        for(const tu of toolUses){
+          let resultText = '';
+          if(tu.name==='search_notes'){
+            const hits = searchMaterials(tu.input.query||'');
+            if(traceEl) traceEl.textContent = `🔎 Searching your materials for "${tu.input.query}"…`;
+            resultText = hits.length ? hits.map(h=>`[${h.title}] ${h.chunk}`).join('\n---\n') : 'No matching passages found in saved materials.';
+          } else if(tu.name==='save_flashcard'){
+            flashcards.unshift({question:tu.input.question, answer:tu.input.answer, topic:tu.input.topic||'', created:Date.now()});
+            await saveKey('flashcards', flashcards);
+            if(traceEl) traceEl.textContent = `🗂️ Saved a flashcard: "${tu.input.question}"`;
+            resultText = 'Flashcard saved.';
+          }
+          toolResults.push({ type:'tool_result', tool_use_id: tu.id, content: resultText });
+        }
+        apiMessages.push({role:'user', content: toolResults});
+        continue;
+      } else {
+        const finalText = content.map(b=>b.text||'').join('');
+        document.getElementById('thinking')?.remove();
+        chatHistory.push({role:'assistant', content: finalText});
+        await saveKey('chat-history', chatHistory.slice(-20));
+        renderChat();
+        break;
+      }
+    }
+  }catch(e){
+    console.error(e);
+    document.getElementById('thinking')?.remove();
+    chatHistory.push({role:'assistant', content:'Something went wrong reaching the assistant — please try again.'});
+    renderChat();
+  }
+}
+
+/* ---------- QUIZ TAB ---------- */
+function renderQuizSourceOptions(){
+  const sel = document.getElementById('quizSource');
+  sel.innerHTML = '<option value="">— topic only —</option>' + materials.map(m=>`<option value="${m.id}">${escapeHtml(m.title)}</option>`).join('');
+}
+document.getElementById('genQuiz').addEventListener('click', async ()=>{
+  const sourceId = document.getElementById('quizSource').value;
+  const topic = document.getElementById('quizTopic').value.trim();
+  const count = parseInt(document.getElementById('quizCount').value)||5;
+  const material = materials.find(m=>m.id===sourceId);
+  if(!material && !topic){ alert('Choose a material or enter a topic.'); return; }
+
+  document.getElementById('quizLoading').style.display='inline';
+  const sys = `You are a quiz-writing assistant. Return ONLY valid JSON, no prose, no markdown fences. Shape:
+{"topic": string, "questions":[{"q": string, "options":[string,string,string,string], "correct": 0-3, "explain": string}]}
+Write exactly ${count} multiple-choice questions. Vary difficulty. Keep options concise.`;
+  const userMsg = material
+    ? `Base the quiz on this material titled "${material.title}":\n\n${material.chunks.join(' ')}`
+    : `Write a quiz on this topic: ${topic}`;
+  try{
+    const data = await callClaude([{role:'user', content:userMsg}], sys);
+    const text = (data.content||[]).map(b=>b.text||'').join('');
+    const clean = text.replace(/```json|```/g,'').trim();
+    const quiz = JSON.parse(clean);
+    renderQuiz(quiz);
+  }catch(e){
+    console.error(e);
+    alert('Could not generate the quiz — try again.');
+  }
+  document.getElementById('quizLoading').style.display='none';
+});
+
+function renderQuiz(quiz){
+  const area = document.getElementById('quizArea');
+  area.style.display='block';
+  let answered = new Array(quiz.questions.length).fill(false);
+  let correctCount = 0;
+  area.innerHTML = `<h2 style="font-size:1.05rem; margin-bottom:14px;">${escapeHtml(quiz.topic||'Quiz')}</h2>` +
+    quiz.questions.map((q,qi)=>`
+      <div class="qcard" data-qi="${qi}">
+        <div class="qtext">${qi+1}. ${escapeHtml(q.q)}</div>
+        ${q.options.map((opt,oi)=>`<button class="opt" data-oi="${oi}">${escapeHtml(opt)}</button>`).join('')}
+        <div class="explain" style="display:none;"></div>
+      </div>`).join('') +
+    `<div id="quizScoreLine" class="muted" style="margin-top:8px;"></div>`;
+
+  area.querySelectorAll('.qcard').forEach(card=>{
+    const qi = parseInt(card.dataset.qi);
+    const q = quiz.questions[qi];
+    card.querySelectorAll('.opt').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        if(answered[qi]) return;
+        answered[qi]=true;
+        const oi = parseInt(btn.dataset.oi);
+        card.querySelectorAll('.opt').forEach((b,bi)=>{
+          if(bi===q.correct) b.classList.add('correct');
+          else if(bi===oi) b.classList.add('wrong');
+        });
+        const ex = card.querySelector('.explain');
+        ex.style.display='block';
+        ex.textContent = q.explain || '';
+        if(oi===q.correct) correctCount++;
+        else{
+          flashcards.unshift({question:q.q, answer:q.options[q.correct], topic:quiz.topic||'', created:Date.now()});
+          await saveKey('flashcards', flashcards);
+        }
+        if(answered.every(a=>a)){
+          document.getElementById('quizScoreLine').textContent = `Score: ${correctCount} / ${quiz.questions.length}`;
+          quizHistory.unshift({topic:quiz.topic||'Quiz', score:correctCount, total:quiz.questions.length, date:Date.now()});
+          await saveKey('quiz-history', quizHistory);
+        }
+      });
+    });
+  });
+}
+
+/* ---------- PROGRESS TAB (Memory) ---------- */
+function renderProgress(){
+  const totalTasks = plans.reduce((s,p)=> s + p.days.reduce((s2,d)=>s2+d.tasks.length,0), 0);
+  const doneTasks = plans.reduce((s,p)=> s + p.days.reduce((s2,d)=>s2+d.tasks.filter(t=>t.done).length,0), 0);
+  const avgScore = quizHistory.length ? Math.round(100*quizHistory.reduce((s,q)=>s+q.score/q.total,0)/quizHistory.length) : null;
+
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat"><div class="num">${materials.length}</div><div class="lbl">Materials saved</div></div>
+    <div class="stat"><div class="num">${doneTasks}/${totalTasks||0}</div><div class="lbl">Plan tasks done</div></div>
+    <div class="stat"><div class="num">${quizHistory.length}</div><div class="lbl">Quizzes taken</div></div>
+    <div class="stat"><div class="num">${avgScore!==null? avgScore+'%':'—'}</div><div class="lbl">Avg. quiz score</div></div>
+    <div class="stat"><div class="num">${flashcards.length}</div><div class="lbl">Flashcards</div></div>
+  `;
+
+  const qh = document.getElementById('quizHistoryList');
+  qh.innerHTML = quizHistory.length ? quizHistory.slice(0,10).map(q=>`
+    <div class="bar-row">
+      <span style="width:120px;">${escapeHtml(q.topic)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(100*q.score/q.total)}%"></div></div>
+      <span>${q.score}/${q.total}</span>
+    </div>`).join('') : '<div class="empty">No quizzes yet.</div>';
+
+  const fl = document.getElementById('flashList');
+  fl.innerHTML = flashcards.length ? flashcards.slice(0,15).map(f=>`
+    <div class="flash"><div class="q">${escapeHtml(f.question)}</div><div class="a">${escapeHtml(f.answer)}</div></div>`).join('')
+    : '<div class="empty">No flashcards yet — ask questions or take a quiz to build your deck.</div>';
+}
+
+/* ---------- init ---------- */
+(async function init(){
+  materials = await loadKey('materials', []);
+  plans = await loadKey('plans', []);
+  flashcards = await loadKey('flashcards', []);
+  quizHistory = await loadKey('quiz-history', []);
+  chatHistory = await loadKey('chat-history', []);
+  renderMaterials();
+  renderPlans();
+  renderChat();
+  renderQuizSourceOptions();
+})();
+</script>
+</body>
+</html>
